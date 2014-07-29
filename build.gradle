@@ -9,7 +9,7 @@ buildscript {
 apply plugin: 'android-library'
 
 dependencies {
-  compile project(':libraries:google-play-services_lib')
+    compile 'com.google.android.gms:play-services:5.0.77'
   compile 'com.android.support:support-v4:20.0.0'
 }
 
