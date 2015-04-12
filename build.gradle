@@ -3,19 +3,24 @@ buildscript {
           maven { url 'http://repo1.maven.org/maven2' }
      }
      dependencies {
-          classpath 'com.android.tools.build:gradle:0.12.+'
+          classpath 'com.android.tools.build:gradle:1.1.0'
      }
 }
 apply plugin: 'android-library'
 
 dependencies {
-    compile 'com.google.android.gms:play-services:5.0.89'
+    compile 'com.google.android.gms:play-services-maps:7.0.0'
     compile 'com.android.support:support-v4:20.0.0'
 }
 
 android {
     compileSdkVersion 19
-    buildToolsVersion "19.1.0"
+    buildToolsVersion "22.0.1"
+
+    defaultConfig {
+        minSdkVersion 9
+    }
+
     sourceSets {
         main {
               manifest.srcFile 'AndroidManifest.xml'
