@@ -1,8 +1,5 @@
 package com.cocoahero.android.gmaps.addons.mapbox;
 
-import java.io.Closeable;
-import java.io.File;
-
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
@@ -10,6 +7,9 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Tile;
 import com.google.android.gms.maps.model.TileProvider;
+
+import java.io.Closeable;
+import java.io.File;
 
 public class MapBoxOfflineTileProvider implements TileProvider, Closeable {
 
@@ -24,6 +24,8 @@ public class MapBoxOfflineTileProvider implements TileProvider, Closeable {
     private LatLngBounds mBounds;
 
     private SQLiteDatabase mDatabase;
+
+    private final Object mDatabaseLock = new Object();
 
     // ------------------------------------------------------------------------
     // Constructors
@@ -47,22 +49,24 @@ public class MapBoxOfflineTileProvider implements TileProvider, Closeable {
     @Override
     public Tile getTile(int x, int y, int z) {
         Tile tile = NO_TILE;
-        if (this.isZoomLevelAvailable(z) && this.isDatabaseAvailable()) {
-            String[] projection = {
-                "tile_data"
-            };
-            int row = ((int) (Math.pow(2, z) - y) - 1);
-            String predicate = "tile_row = ? AND tile_column = ? AND zoom_level = ?";
-            String[] values = {
-                    String.valueOf(row), String.valueOf(x), String.valueOf(z)
-            };
-            Cursor c = this.mDatabase.query("tiles", projection, predicate, values, null, null, null);
-            if (c != null) {
-                c.moveToFirst();
-                if (!c.isAfterLast()) {
-                    tile = new Tile(256, 256, c.getBlob(0));
+        synchronized (mDatabaseLock) {
+            if (this.isZoomLevelAvailable(z) && this.isDatabaseAvailable()) {
+                String[] projection = {
+                        "tile_data"
+                };
+                int row = ((int) (Math.pow(2, z) - y) - 1);
+                String predicate = "tile_row = ? AND tile_column = ? AND zoom_level = ?";
+                String[] values = {
+                        String.valueOf(row), String.valueOf(x), String.valueOf(z)
+                };
+                Cursor c = this.mDatabase.query("tiles", projection, predicate, values, null, null, null);
+                if (c != null) {
+                    c.moveToFirst();
+                    if (!c.isAfterLast()) {
+                        tile = new Tile(256, 256, c.getBlob(0));
+                    }
+                    c.close();
                 }
-                c.close();
             }
         }
         return tile;
@@ -83,9 +87,11 @@ public class MapBoxOfflineTileProvider implements TileProvider, Closeable {
      */
     @Override
     public void close() {
-        if (this.mDatabase != null) {
-            this.mDatabase.close();
-            this.mDatabase = null;
+        synchronized (mDatabaseLock) {
+            if (this.mDatabase != null) {
+                this.mDatabase.close();
+                this.mDatabase = null;
+            }
         }
     }
 
@@ -93,6 +99,13 @@ public class MapBoxOfflineTileProvider implements TileProvider, Closeable {
     // Public Methods
     // ------------------------------------------------------------------------
 
+    public void swapDatabase(File newDatabaseFile) {
+        synchronized (mDatabaseLock) {
+            mDatabase.close();
+            int flags = SQLiteDatabase.OPEN_READONLY | SQLiteDatabase.NO_LOCALIZED_COLLATORS;
+            this.mDatabase = SQLiteDatabase.openDatabase(newDatabaseFile.getAbsolutePath(), null, flags);
+        }
+    }
     /**
      * The minimum zoom level supported by this provider.
      * 
@@ -203,7 +216,9 @@ public class MapBoxOfflineTileProvider implements TileProvider, Closeable {
     }
 
     private boolean isDatabaseAvailable() {
-        return (this.mDatabase != null) && (this.mDatabase.isOpen());
+        synchronized (mDatabaseLock) {
+            return (this.mDatabase != null) && (this.mDatabase.isOpen());
+        }
     }
 
 }
